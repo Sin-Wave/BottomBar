@@ -511,17 +511,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
                 && mItems != null && mItems.length > 0) {
             darkThemeMagic();
 
-            for (int i = 0; i < mItemContainer.getChildCount(); i++) {
-                View bottomBarTab = mItemContainer.getChildAt(i);
-                ((ImageView) bottomBarTab.findViewById(R.id.bb_bottom_bar_icon))
-                        .setColorFilter(mIconColor);
-
-                if (i == mCurrentTabPosition) {
-                    selectTab(bottomBarTab, false);
-                } else {
-                    unselectTab(bottomBarTab, false);
-                }
-            }
+            updateColorFilters();
         }
 
         mIsDarkTheme = darkThemeEnabled;
@@ -934,10 +924,17 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
     }
 
     private void updateColorFilters() {
+        if (mItemContainer == null) {
+            return;
+        }
+
         for (int i = 0; i < mItemContainer.getChildCount(); i++) {
             View bottomBarTab = mItemContainer.getChildAt(i);
-            ((ImageView) bottomBarTab.findViewById(R.id.bb_bottom_bar_icon))
-                    .setColorFilter(mIconColor);
+            if (i == mCurrentTabPosition) {
+                selectTab(bottomBarTab, false);
+            } else {
+                unselectTab(bottomBarTab, false);
+            }
         }
     }
 
@@ -1191,14 +1188,11 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
 
         int tabPosition = findItemPosition(tab);
 
-        if (!mIsShiftingMode || mIsTabletMode) {
-            int activeColor = mCustomActiveTabColor != 0 ?
-                    mCustomActiveTabColor : mPrimaryColor;
-            icon.setColorFilter(activeColor);
+        int activeColor = mCustomActiveTabColor != 0 ? mCustomActiveTabColor : mPrimaryColor;
+        icon.setColorFilter(activeColor);
 
-            if (title != null) {
-                title.setTextColor(activeColor);
-            }
+        if (title != null) {
+            title.setTextColor(activeColor);
         }
 
         if (mIsDarkTheme) {
@@ -1251,13 +1245,11 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
         ImageView icon = (ImageView) tab.findViewById(R.id.bb_bottom_bar_icon);
         TextView title = (TextView) tab.findViewById(R.id.bb_bottom_bar_title);
 
-        if (!mIsShiftingMode || mIsTabletMode) {
-            int inActiveColor = mIsDarkTheme ? mIconColor : mInActiveColor;
-            icon.setColorFilter(inActiveColor);
+        int inActiveColor = mIsDarkTheme ? mIconColor : mInActiveColor;
+        icon.setColorFilter(inActiveColor);
 
-            if (title != null) {
-                title.setTextColor(inActiveColor);
-            }
+        if (title != null) {
+            title.setTextColor(inActiveColor);
         }
 
         if (mIsDarkTheme) {
