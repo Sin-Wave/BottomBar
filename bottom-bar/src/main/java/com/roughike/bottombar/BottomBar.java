@@ -82,7 +82,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
     private int mPrimaryColor;
     private int mInActiveColor;
     private int mDarkBackgroundColor;
-    private int mWhiteColor;
+    private int mIconColor;
 
     private int mScreenWidth;
     private int mTwoDp;
@@ -514,7 +514,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
             for (int i = 0; i < mItemContainer.getChildCount(); i++) {
                 View bottomBarTab = mItemContainer.getChildAt(i);
                 ((ImageView) bottomBarTab.findViewById(R.id.bb_bottom_bar_icon))
-                        .setColorFilter(mWhiteColor);
+                        .setColorFilter(mIconColor);
 
                 if (i == mCurrentTabPosition) {
                     selectTab(bottomBarTab, false);
@@ -797,7 +797,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
         mContext = context;
 
         mDarkBackgroundColor = ContextCompat.getColor(getContext(), R.color.bb_darkBackgroundColor);
-        mWhiteColor = ContextCompat.getColor(getContext(), R.color.white);
+        mIconColor = ContextCompat.getColor(getContext(), R.color.white);
         mPrimaryColor = MiscUtils.getColor(getContext(), R.attr.colorPrimary);
         mInActiveColor = ContextCompat.getColor(getContext(), R.color.bb_inActiveBottomBarItemColor);
 
@@ -920,6 +920,24 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
 
         if (mBackgroundOverlay != null) {
             mBackgroundOverlay.setVisibility(visibility);
+        }
+    }
+
+    /**
+     * Sets the color filter for all BottomBar icons.
+     *
+     * @param color as ARGB value
+     */
+    public void setIconColor(int color) {
+        this.mIconColor = color;
+        updateColorFilters();
+    }
+
+    private void updateColorFilters() {
+        for (int i = 0; i < mItemContainer.getChildCount(); i++) {
+            View bottomBarTab = mItemContainer.getChildAt(i);
+            ((ImageView) bottomBarTab.findViewById(R.id.bb_bottom_bar_icon))
+                    .setColorFilter(mIconColor);
         }
     }
 
@@ -1087,7 +1105,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
             }
 
             if (mIsDarkTheme || (!mIsTabletMode && mIsShiftingMode)) {
-                icon.setColorFilter(mWhiteColor);
+                icon.setColorFilter(mIconColor);
             }
 
             if (bottomBarItemBase instanceof BottomBarTab) {
@@ -1234,7 +1252,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
         TextView title = (TextView) tab.findViewById(R.id.bb_bottom_bar_title);
 
         if (!mIsShiftingMode || mIsTabletMode) {
-            int inActiveColor = mIsDarkTheme ? mWhiteColor : mInActiveColor;
+            int inActiveColor = mIsDarkTheme ? mIconColor : mInActiveColor;
             icon.setColorFilter(inActiveColor);
 
             if (title != null) {
