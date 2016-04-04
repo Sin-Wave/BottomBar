@@ -88,6 +88,9 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
     private int mTwoDp;
     private int mTenDp;
     private int mMaxFixedItemWidth;
+    private int mMaxInActiveShiftingItemWidth;
+    private int mInActiveShiftingItemWidth;
+    private int mActiveShiftingItemWidth;
 
     private Object mListener;
     private Object mMenuListener;
@@ -108,6 +111,8 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
 
     private boolean mIsDarkTheme;
     private boolean mIgnoreNightMode;
+    private boolean mIgnoreShiftingResize;
+
     private int mCustomActiveTabColor;
 
     private boolean mDrawBehindNavBar = true;
@@ -366,10 +371,14 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
                     position + ". This BottomBar has no items at that position.");
         }
 
-        unselectTab(mItemContainer.findViewWithTag(TAG_BOTTOM_BAR_VIEW_ACTIVE), animate);
-        selectTab(mItemContainer.getChildAt(position), animate);
+        View oldTab = mItemContainer.findViewWithTag(TAG_BOTTOM_BAR_VIEW_ACTIVE);
+        View newTab = mItemContainer.getChildAt(position);
+
+        unselectTab(oldTab, animate);
+        selectTab(newTab, animate);
 
         updateSelectedTab(position);
+        shiftingMagic(oldTab, newTab);
     }
 
     /**
@@ -379,10 +388,11 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
      * @param defaultTabPosition the default tab position.
      */
     public void setDefaultTabPosition(int defaultTabPosition) {
-        if (mItems == null || mItems.length == 0) {
-            throw new UnsupportedOperationException("Can't set default tab at " +
-                    "position " + defaultTabPosition + ". This BottomBar has no items set yet.");
-        } else if (defaultTabPosition > mItems.length - 1 || defaultTabPosition < 0) {
+        if (mItems == null) {
+            mCurrentTabPosition = defaultTabPosition;
+            return;
+        } else if (mItems.length == 0 || defaultTabPosition > mItems.length - 1
+                || defaultTabPosition < 0) {
             throw new IndexOutOfBoundsException("Can't set default tab at position " +
                     defaultTabPosition + ". This BottomBar has no items at that position.");
         }
@@ -471,7 +481,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
                     "index " + tabPosition + ". You have no BottomBar Tabs at that position.");
         }
 
-        if (!mIsShiftingMode || mIsTabletMode) return;
+        if (mIsDarkTheme || !mIsShiftingMode || mIsTabletMode) return;
 
         if (mColorMap == null) {
             mColorMap = new HashMap<>();
@@ -498,23 +508,29 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
     }
 
     /**
+     * Deprecated. Use {@link #useDarkTheme()} instead.
+     */
+    @Deprecated
+    public void useDarkTheme(boolean darkThemeEnabled) {
+        mIsDarkTheme = darkThemeEnabled;
+        useDarkTheme();
+    }
+
+    /**
      * Use dark theme instead of the light one.
      * <p/>
      * NOTE: You might want to change your active tab color to something else
      * using {@link #setActiveTabColor(int)}, as the default primary color might
      * not have enough contrast for the dark background.
-     *
-     * @param darkThemeEnabled whether the dark the should be enabled or not.
      */
-    public void useDarkTheme(boolean darkThemeEnabled) {
-        if (!mIsDarkTheme && darkThemeEnabled
-                && mItems != null && mItems.length > 0) {
+    public void useDarkTheme() {
+        if (!mIsDarkTheme && mItems != null && mItems.length > 0) {
             darkThemeMagic();
 
             updateColorFilters();
         }
 
-        mIsDarkTheme = darkThemeEnabled;
+        mIsDarkTheme = true;
     }
 
     /**
@@ -696,6 +712,15 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
     }
 
     /**
+     * Don't resize the tabs when selecting a new one, so every tab is the same0 if you have more than three
+     * tabs. The text still displays the scale animation and the icon moves up, but the badass width animation
+     * is ignored.
+     */
+    public void noResizeGoodness() {
+        mIgnoreShiftingResize = true;
+    }
+
+    /**
      * Get this BottomBar's height (or width), depending if the BottomBar
      * is on the bottom (phones) or the left (tablets) of the screen.
      *
@@ -795,12 +820,13 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
         mTwoDp = MiscUtils.dpToPixel(mContext, 2);
         mTenDp = MiscUtils.dpToPixel(mContext, 10);
         mMaxFixedItemWidth = MiscUtils.dpToPixel(mContext, 168);
+        mMaxInActiveShiftingItemWidth = MiscUtils.dpToPixel(mContext, 96);
     }
 
     private void initializeViews() {
         mIsTabletMode = !mIgnoreTabletLayout &&
                 mContext.getResources().getBoolean(R.bool.bb_bottom_bar_is_tablet_mode);
-
+        ViewCompat.setElevation(this, MiscUtils.dpToPixel(mContext, 8));
         View rootView = View.inflate(mContext, mIsTabletMode ?
                         R.layout.bb_bottom_bar_item_container_tablet : R.layout.bb_bottom_bar_item_container,
                 null);
@@ -842,7 +868,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
                 public void onGlobalLayout() {
                     if (!mShyHeightAlreadyCalculated) {
                         ((CoordinatorLayout.LayoutParams) getLayoutParams())
-                                .setBehavior(new BottomNavigationBehavior(getOuterContainer().getHeight(), 0));
+                                .setBehavior(new BottomNavigationBehavior(getOuterContainer().getHeight(), 0, isShy(), mIsTabletMode));
                     }
 
                     ViewTreeObserver obs = getViewTreeObserver();
@@ -941,10 +967,21 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
     @Override
     public void onClick(View v) {
         if (v.getTag().equals(TAG_BOTTOM_BAR_VIEW_INACTIVE)) {
-            unselectTab(findViewWithTag(TAG_BOTTOM_BAR_VIEW_ACTIVE), true);
+            View oldTab = findViewWithTag(TAG_BOTTOM_BAR_VIEW_ACTIVE);
+
+            unselectTab(oldTab, true);
             selectTab(v, true);
+
+            shiftingMagic(oldTab, v);
         }
         updateSelectedTab(findItemPosition(v));
+    }
+
+    private void shiftingMagic(View oldTab, View newTab) {
+        if (!mIsTabletMode && mIsShiftingMode && !mIgnoreShiftingResize) {
+            MiscUtils.resizeTab(oldTab, oldTab.getWidth(), mInActiveShiftingItemWidth);
+            MiscUtils.resizeTab(newTab, newTab.getWidth(), mActiveShiftingItemWidth);
+        }
     }
 
     private void updateSelectedTab(int newPosition) {
@@ -1060,15 +1097,15 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
             mIsDarkTheme = true;
         }
 
-        if (!mIsTabletMode && mIsShiftingMode) {
+        if (mIsDarkTheme) {
+            darkThemeMagic();
+        } else if (!mIsTabletMode && mIsShiftingMode) {
             mDefaultBackgroundColor = mCurrentBackgroundColor = mPrimaryColor;
             mBackgroundView.setBackgroundColor(mDefaultBackgroundColor);
 
             if (mContext instanceof Activity) {
                 navBarMagic((Activity) mContext, this);
             }
-        } else if (mIsDarkTheme) {
-            darkThemeMagic();
         }
 
         View[] viewsToAdd = new View[bottomBarItems.length];
@@ -1136,10 +1173,25 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
                     mMaxFixedItemWidth
             );
 
-            LinearLayout.LayoutParams params = new LinearLayout
-                    .LayoutParams(proposedItemWidth, LinearLayout.LayoutParams.WRAP_CONTENT);
+            mInActiveShiftingItemWidth = (int) (proposedItemWidth * 0.9);
+            mActiveShiftingItemWidth = (int) (proposedItemWidth + (proposedItemWidth * (bottomBarItems.length * 0.1)));
 
             for (View bottomBarView : viewsToAdd) {
+                LinearLayout.LayoutParams params;
+
+                if (mIsShiftingMode && !mIgnoreShiftingResize) {
+                    if (TAG_BOTTOM_BAR_VIEW_ACTIVE.equals(bottomBarView.getTag())) {
+                        params = new LinearLayout.LayoutParams(mActiveShiftingItemWidth,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT);
+                    } else {
+                        params = new LinearLayout.LayoutParams(mInActiveShiftingItemWidth,
+                                LinearLayout.LayoutParams.WRAP_CONTENT);
+                    }
+                } else {
+                    params = new LinearLayout.LayoutParams(proposedItemWidth,
+                                LinearLayout.LayoutParams.WRAP_CONTENT);
+                }
+
                 bottomBarView.setLayoutParams(params);
                 mItemContainer.addView(bottomBarView);
             }
@@ -1295,7 +1347,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
     }
 
     private void handleBackgroundColorChange(int tabPosition, View tab) {
-        if (!mIsShiftingMode || mIsTabletMode) return;
+        if (mIsDarkTheme || !mIsShiftingMode || mIsTabletMode) return;
 
         if (mColorMap != null && mColorMap.containsKey(tabPosition)) {
             handleBackgroundColorChange(
@@ -1471,7 +1523,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
                         int defaultOffset = bottomBar.useExtraOffset() ? navBarHeightCopy : 0;
                         bottomBar.setTranslationY(defaultOffset);
                         ((CoordinatorLayout.LayoutParams) bottomBar.getLayoutParams())
-                                .setBehavior(new BottomNavigationBehavior(newHeight, defaultOffset));
+                                .setBehavior(new BottomNavigationBehavior(newHeight, defaultOffset, bottomBar.isShy(), bottomBar.mIsTabletMode));
                     }
 
                     ViewTreeObserver obs = outerContainer.getViewTreeObserver();
