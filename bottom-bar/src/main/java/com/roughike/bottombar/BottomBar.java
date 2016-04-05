@@ -1019,7 +1019,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
 
             if (!isReselection) {
                 onTabClickListener.onTabSelected(position);
-            } else {
+            } else if (!mIsComingFromRestoredState) {
                 onTabClickListener.onTabReSelected(position);
             }
         } else if (listener instanceof OnTabSelectedListener) {
@@ -1038,7 +1038,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
 
             if (!isReselection) {
                 onMenuTabClickListener.onMenuTabSelected(menuItemId);
-            } else {
+            } else if (!mIsComingFromRestoredState) {
                 onMenuTabClickListener.onMenuTabReSelected(menuItemId);
             }
         } else if (listener instanceof OnMenuTabSelectedListener) {
@@ -1182,14 +1182,14 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
                 if (mIsShiftingMode && !mIgnoreShiftingResize) {
                     if (TAG_BOTTOM_BAR_VIEW_ACTIVE.equals(bottomBarView.getTag())) {
                         params = new LinearLayout.LayoutParams(mActiveShiftingItemWidth,
-                                    LinearLayout.LayoutParams.WRAP_CONTENT);
+                                LinearLayout.LayoutParams.WRAP_CONTENT);
                     } else {
                         params = new LinearLayout.LayoutParams(mInActiveShiftingItemWidth,
                                 LinearLayout.LayoutParams.WRAP_CONTENT);
                     }
                 } else {
                     params = new LinearLayout.LayoutParams(proposedItemWidth,
-                                LinearLayout.LayoutParams.WRAP_CONTENT);
+                            LinearLayout.LayoutParams.WRAP_CONTENT);
                 }
 
                 bottomBarView.setLayoutParams(params);
