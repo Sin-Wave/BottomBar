@@ -15,6 +15,7 @@ import android.support.annotation.StyleRes;
 import android.support.design.widget.CoordinatorLayout;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.view.ViewCompat;
+import android.support.v4.view.ViewPropertyAnimatorCompat;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -53,7 +54,6 @@ import java.util.HashMap;
  */
 public class BottomBar extends FrameLayout implements View.OnClickListener, View.OnLongClickListener {
     private static final long ANIMATION_DURATION = 150;
-    private static final int MAX_FIXED_TAB_COUNT = 3;
 
     private static final String STATE_CURRENT_SELECTED_TAB = "STATE_CURRENT_SELECTED_TAB";
     private static final String STATE_BADGE_STATES_BUNDLE = "STATE_BADGE_STATES_BUNDLE";
@@ -124,6 +124,8 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
 
     // For fragment state restoration
     private boolean mShouldUpdateFragmentInitially;
+
+    private int mMaxFixedTabCount = 3;
 
     /**
      * Bind the BottomBar to your Activity, and inflate your layout here.
@@ -426,6 +428,36 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
     }
 
     /**
+     * Set the maximum number of tabs, after which the tabs should be shifting
+     * ones with a background color.
+     * <p/>
+     * NOTE: You must call this method before setting any items.
+     *
+     * @param count maximum number of fixed tabs.
+     */
+    public void setMaxFixedTabs(int count) {
+        if (mItems != null) {
+            throw new UnsupportedOperationException("This BottomBar already has items! " +
+                    "You must call the setMaxFixedTabs() method before specifying any items.");
+        }
+
+        mMaxFixedTabCount = count;
+    }
+
+    /**
+     * Always show the titles and icons also on inactive tabs, even if there's more
+     * than three of them.
+     */
+    public void useFixedMode() {
+        if (mItems != null) {
+            throw new UnsupportedOperationException("This BottomBar already has items! " +
+                    "You must call the forceFixedMode() method before specifying any items.");
+        }
+
+        mMaxFixedTabCount = -1;
+    }
+
+    /**
      * Call this method in your Activity's onSaveInstanceState
      * to keep the BottomBar's state on configuration change.
      *
@@ -607,10 +639,26 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
                     "index " + tabPosition + ". You have no BottomBar Tabs at that position.");
         }
 
+        final View tab = mItemContainer.getChildAt(tabPosition);
+
         BottomBarBadge badge = new BottomBarBadge(mContext, tabPosition,
-                mItemContainer.getChildAt(tabPosition), backgroundColor);
+                tab, backgroundColor);
         badge.setTag(TAG_BADGE + tabPosition);
         badge.setCount(initialCount);
+
+        tab.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                handleClick((View) tab.getParent());
+            }
+        });
+
+        tab.setOnLongClickListener(new OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                return handleLongClick((View) tab.getParent());
+            }
+        });
 
         if (mBadgeMap == null) {
             mBadgeMap = new HashMap<>();
@@ -925,6 +973,11 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
     }
 
     protected void setBarVisibility(int visibility) {
+        if (mIsShy) {
+            toggleShyVisibility(visibility == VISIBLE);
+            return;
+        }
+
         if (mOuterContainer != null) {
             mOuterContainer.setVisibility(visibility);
         }
@@ -963,8 +1016,24 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
         }
     }
 
+    /**
+     * Toggle translation of BottomBar to hidden and visible in a CoordinatorLayout.
+     *
+     * @param visible true resets translation to 0, false translates view to hidden
+     */
+    protected void toggleShyVisibility(boolean visible) {
+        BottomNavigationBehavior<BottomBar> from = BottomNavigationBehavior.from(this);
+        if (from != null) {
+            from.setHidden(this, visible);
+        }
+    }
+
     @Override
     public void onClick(View v) {
+        handleClick(v);
+    }
+
+    private void handleClick(View v) {
         if (v.getTag().equals(TAG_BOTTOM_BAR_VIEW_INACTIVE)) {
             View oldTab = findViewWithTag(TAG_BOTTOM_BAR_VIEW_ACTIVE);
 
@@ -978,6 +1047,16 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
 
     private void shiftingMagic(View oldTab, View newTab, boolean animate) {
         if (!mIsTabletMode && mIsShiftingMode && !mIgnoreShiftingResize) {
+            if (oldTab instanceof FrameLayout) {
+                // It's a badge, goddammit!
+                oldTab = ((FrameLayout) oldTab).getChildAt(0);
+            }
+
+            if (newTab instanceof FrameLayout) {
+                // It's a badge, goddammit!
+                newTab = ((FrameLayout) newTab).getChildAt(0);
+            }
+
             if (animate) {
                 MiscUtils.resizeTab(oldTab, oldTab.getWidth(), mInActiveShiftingItemWidth);
                 MiscUtils.resizeTab(newTab, newTab.getWidth(), mActiveShiftingItemWidth);
@@ -1023,7 +1102,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
 
             if (!isReselection) {
                 onTabClickListener.onTabSelected(position);
-            } else if (!mIsComingFromRestoredState) {
+            } else {
                 onTabClickListener.onTabReSelected(position);
             }
         } else if (listener instanceof OnTabSelectedListener) {
@@ -1042,7 +1121,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
 
             if (!isReselection) {
                 onMenuTabClickListener.onMenuTabSelected(menuItemId);
-            } else if (!mIsComingFromRestoredState) {
+            } else {
                 onMenuTabClickListener.onMenuTabReSelected(menuItemId);
             }
         } else if (listener instanceof OnMenuTabSelectedListener) {
@@ -1079,6 +1158,10 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
 
     @Override
     public boolean onLongClick(View v) {
+        return handleLongClick(v);
+    }
+
+    private boolean handleLongClick(View v) {
         if ((mIsShiftingMode || mIsTabletMode) && v.getTag().equals(TAG_BOTTOM_BAR_VIEW_INACTIVE)) {
             Toast.makeText(mContext, mItems[findItemPosition(v)].getTitle(mContext), Toast.LENGTH_SHORT).show();
         }
@@ -1094,7 +1177,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
         int index = 0;
         int biggestWidth = 0;
 
-        mIsShiftingMode = MAX_FIXED_TAB_COUNT < bottomBarItems.length;
+        mIsShiftingMode = mMaxFixedTabCount >= 0 && mMaxFixedTabCount < bottomBarItems.length;
 
         if (!mIsDarkTheme && !mIgnoreNightMode
                 && MiscUtils.isNightMode(mContext)) {
@@ -1266,11 +1349,17 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
         int translationY = mIsShiftingMode ? mTenDp : mTwoDp;
 
         if (animate) {
-            ViewCompat.animate(title)
+            ViewPropertyAnimatorCompat titleAnimator = ViewCompat.animate(title)
                     .setDuration(ANIMATION_DURATION)
                     .scaleX(1)
-                    .scaleY(1)
-                    .start();
+                    .scaleY(1);
+
+            if (mIsShiftingMode) {
+                titleAnimator.alpha(1.0f);
+            }
+
+            titleAnimator.start();
+
             ViewCompat.animate(tab)
                     .setDuration(ANIMATION_DURATION)
                     .translationY(-translationY)
@@ -1291,6 +1380,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
 
             if (mIsShiftingMode) {
                 ViewCompat.setAlpha(icon, 1.0f);
+                ViewCompat.setAlpha(title, 1.0f);
             }
         }
     }
@@ -1323,11 +1413,17 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
         float scale = mIsShiftingMode ? 0 : 0.86f;
 
         if (animate) {
-            ViewCompat.animate(title)
+            ViewPropertyAnimatorCompat titleAnimator = ViewCompat.animate(title)
                     .setDuration(ANIMATION_DURATION)
                     .scaleX(scale)
-                    .scaleY(scale)
-                    .start();
+                    .scaleY(scale);
+
+            if (mIsShiftingMode) {
+                titleAnimator.alpha(0);
+            }
+
+            titleAnimator.start();
+
             ViewCompat.animate(tab)
                     .setDuration(ANIMATION_DURATION)
                     .translationY(0)
@@ -1346,6 +1442,7 @@ public class BottomBar extends FrameLayout implements View.OnClickListener, View
 
             if (mIsShiftingMode) {
                 ViewCompat.setAlpha(icon, 0.6f);
+                ViewCompat.setAlpha(title, 0);
             }
         }
     }

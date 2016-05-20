@@ -1,8 +1,6 @@
 # BottomBar
 <img src="https://raw.githubusercontent.com/roughike/BottomBar/master/scrolling_demo.gif" width="30%" /> <img src="https://raw.githubusercontent.com/roughike/BottomBar/master/demo_shifting.gif" width="30%" /> <img src="https://raw.githubusercontent.com/roughike/BottomBar/master/screenshot_tablet.png" width="33%" /> 
 
-**Don't send me pull requests just yet, not until the dust settles.**
-
 **[How to contribute](https://github.com/roughike/BottomBar/blob/master/README.md#contributions)**
 
 [Common problems and solutions](https://github.com/roughike/BottomBar/blob/master/README.md#common-problems-and-solutions)
@@ -24,7 +22,7 @@ Your uncle Bob's Galaxy S Mini will probably be supported in the future though.
 ## Gimme that Gradle sweetness, pls?
 
 ```groovy
-compile 'com.roughike:bottom-bar:1.2.9'
+compile 'com.roughike:bottom-bar:1.3.3'
 ```
 
 **Maven:**
@@ -32,14 +30,14 @@ compile 'com.roughike:bottom-bar:1.2.9'
 <dependency>
   <groupId>com.roughike</groupId>
   <artifactId>bottom-bar</artifactId>
-  <version>1.2.9</version>
+  <version>1.3.3</version>
   <type>pom</type>
 </dependency>
 ```
 
 ## How?
 
-BottomBar likes Fragments very much, but you can also handle your tab changes by yourself. You can add items by specifying an array of items or **by xml menu resources**.
+You can add items by specifying an array of items or **by xml menu resources**.
 
 #### Adding items from menu resource
 
@@ -70,14 +68,14 @@ public class MainActivity extends AppCompatActivity {
         mBottomBar.setItemsFromMenu(R.menu.bottombar_menu, new OnMenuTabClickListener() {
             @Override
             public void onMenuTabSelected(@IdRes int menuItemId) {
-                if (resId == R.id.bottomBarItemOne) {
+                if (menuItemId == R.id.bottomBarItemOne) {
                     // The user selected item number one.
                 }
             }
 
             @Override
             public void onMenuTabReSelected(@IdRes int menuItemId) {
-                if (resId == R.id.bottomBarItemOne) {
+                if (menuItemId == R.id.bottomBarItemOne) {
                     // The user reselected item number one, scroll your content to top.
                 }
             }
@@ -130,6 +128,9 @@ unreadMessages.setAutoShowAfterUnSelection(true);
 ```java
 // Disable the left bar on tablets and behave exactly the same on mobile and tablets instead.
 mBottomBar.noTabletGoodness();
+
+// Show all titles even when there's more than three tabs.
+mBottomBar.useFixedMode();
 
 // Use the dark theme.
 mBottomBar.useDarkTheme();
@@ -243,20 +244,28 @@ mBottomBar.attach(findViewById(R.id.fragmentContainer), savedInstanceState);
 
 It works nicely with tablets straight out of the box. When the library detects that the user has a tablet, the BottomBar will become a "LeftBar", just like [in the Material Design Guidelines](https://material-design.storage.googleapis.com/publish/material_v_4/material_ext_publish/0B3321sZLoP_HSTd3UFY2aEp2ZDg/components_bottomnavigation_usage2.png).
 
+#### The fancy colour changing background animation isn't working!
+By default, BottomBar only starts to use the specified `mapColorForTab` value for the BottomBar background if you have more than three tabs. If you want to enable this functionality for tab bars with three items or less, do the following before you add any items to the BottomBar:
+
+```java
+mBottomBar.setMaxFixedTabs(n-1);
+```
+
+(where n is the number of tabs: so, if you have a BottomBar with 3 items, you would call `setMaxFixedTabs(2);`)
 
 ## Apps using BottomBar
 
   * [FragNav](https://github.com/ncapdevi/FragNav) : An Android Library for managing multiple stacks of Fragments. BottomBar is used in the sample app.
+  * [BottomNavigationBar](https://github.com/pocheshire/BottomNavigationBar) : BottomBar ported to C# for Xamarin developers
+  * [KyudoScoreBookTeam](https://play.google.com/store/apps/details?id=com.bowyer.app.android.kyudoscoreteam&hl=en) : BottomBar is used in the KyudoScoreBookTeam app.
   
 Send me a pull request with modified README.md to get a shoutout!
 
 ## Contributions
 
-Feel free to create issues. 
+Feel free to create issues and pull requests.
 
-**Don't send me pull requests just yet, not until the dust settles.**
-
-I'm fixing issues and busting my ass to make this library better, _several hours_ every day. Your hard work could be for nothing, as I'm probably fixing / implementing the same problems that you are.
+When creating pull requests, **more is more:** I'd like to see ten small pull requests separated by feature rather than all those combined into a huge one.
 
 ## License
 
